@@ -4,6 +4,10 @@ use super::KernelError; // Ensure KernelError is explicitly in scope
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::collections::HashMap; // Moved HashMap import to the top
 
+// Import thread-related items
+use crate::kernel::thread::{Thread, ThreadId, ThreadState, generate_tid as generate_thread_id};
+use crate::kernel::thread::ThreadManagement; // Added import for the trait itself
+
 // Static counter for generating unique ProcessIds
 static NEXT_PROCESS_ID: AtomicU64 = AtomicU64::new(1); // Start from 1, 0 could be special
 
@@ -29,10 +33,10 @@ pub enum ProcessState {
 pub struct Process {
     pub id: ProcessId,
     pub state: ProcessState,
+    pub threads: HashMap<ThreadId, Thread>, // Added field for threads
     // pub parent_id: Option<ProcessId>,
     // pub priority: u8,
     // pub memory_space: (), // Placeholder for MemorySpace from memory.rs
-    // pub threads: Vec<()>,   // Placeholder for ThreadId from thread.rs
 }
 
 impl Process {
@@ -41,10 +45,49 @@ impl Process {
         Process {
             id,
             state: ProcessState::New, // Default state for a new process
+            threads: HashMap::new(), // Initialize the new threads map
             // parent_id: None,
             // priority: 0,
             // memory_space: (),
-            // threads: Vec::new(),
+        }
+    }
+
+    // New methods to be added:
+
+    pub fn create_new_thread(&mut self) -> KernelResult<ThreadId> {
+        let new_tid = generate_thread_id(); // Uses the imported aliased function
+        // In a real scenario, one might check if new_tid somehow already exists in self.threads,
+        // though a global atomic counter makes this extremely unlikely.
+        if self.threads.contains_key(&new_tid) {
+            return Err(KernelError::Other("Thread ID collision within process".to_string()));
+        }
+        let new_thread = Thread::new(new_tid, self.id); // self.id is the ProcessId
+        self.threads.insert(new_tid, new_thread);
+        Ok(new_tid)
+    }
+
+    pub fn terminate_existing_thread(&mut self, tid: ThreadId) -> KernelResult<()> {
+        if self.threads.remove(&tid).is_some() {
+            Ok(())
+        } else {
+            Err(KernelError::NotFound) // Thread not found in this process
+        }
+    }
+
+    pub fn get_thread_state(&self, tid: ThreadId) -> KernelResult<ThreadState> {
+        match self.threads.get(&tid) {
+            Some(thread) => Ok(thread.state),
+            None => Err(KernelError::NotFound), // Thread not found in this process
+        }
+    }
+
+    pub fn set_thread_state(&mut self, tid: ThreadId, new_state: ThreadState) -> KernelResult<()> {
+        match self.threads.get_mut(&tid) {
+            Some(thread) => {
+                thread.state = new_state;
+                Ok(())
+            }
+            None => Err(KernelError::NotFound), // Thread not found in this process
         }
     }
 }
@@ -110,6 +153,49 @@ impl ProcessManagement for SimpleProcessManager {
         }
     }
 }
+
+// NEW IMPLEMENTATION BLOCK STARTS HERE
+impl ThreadManagement for SimpleProcessManager {
+    fn create_thread(&mut self, pid: ProcessId /*, _start_routine, _args */) -> KernelResult<ThreadId> {
+        match self.processes.get_mut(&pid) {
+            Some(process) => {
+                // Now call the method on the Process struct
+                process.create_new_thread()
+            }
+            None => Err(KernelError::NotFound), // Process not found
+        }
+    }
+
+    fn terminate_thread(&mut self, pid: ProcessId, tid: ThreadId) -> KernelResult<()> {
+        match self.processes.get_mut(&pid) {
+            Some(process) => {
+                process.terminate_existing_thread(tid)
+            }
+            None => Err(KernelError::NotFound), // Process not found
+        }
+    }
+
+    fn sleep_thread(&mut self, pid: ProcessId, tid: ThreadId, _duration_ms: u64) -> KernelResult<()> {
+        // _duration_ms is ignored for now as we don't have actual sleep timers/scheduler interaction.
+        // We just set the state to Blocked.
+        match self.processes.get_mut(&pid) {
+            Some(process) => {
+                process.set_thread_state(tid, ThreadState::Blocked)
+            }
+            None => Err(KernelError::NotFound), // Process not found
+        }
+    }
+
+    fn get_thread_state(&self, pid: ProcessId, tid: ThreadId) -> KernelResult<ThreadState> {
+        match self.processes.get(&pid) {
+            Some(process) => {
+                process.get_thread_state(tid)
+            }
+            None => Err(KernelError::NotFound), // Process not found
+        }
+    }
+}
+// NEW IMPLEMENTATION BLOCK ENDS HERE
 
 #[cfg(test)]
 mod tests {
@@ -220,5 +306,111 @@ mod tests {
             assert!(manager.create_process().is_ok());
         }
         // This doesn't test the collision error path directly but exercises the PID generation.
+    }
+
+    // New tests for ThreadManagement:
+
+    #[test]
+    fn test_create_thread_in_process() {
+        let mut manager = SimpleProcessManager::new();
+        let pid = manager.create_process().expect("Failed to create process for thread test");
+
+        let thread_result = manager.create_thread(pid);
+        assert!(thread_result.is_ok(), "Failed to create thread: {:?}", thread_result.err());
+        let tid = thread_result.unwrap();
+
+        let thread_state = manager.get_thread_state(pid, tid);
+        assert!(thread_state.is_ok(), "Failed to get thread state: {:?}", thread_state.err());
+        assert_eq!(thread_state.unwrap(), ThreadState::Ready);
+    }
+
+    #[test]
+    fn test_create_multiple_threads_in_process() {
+        let mut manager = SimpleProcessManager::new();
+        let pid = manager.create_process().unwrap();
+
+        let tid1 = manager.create_thread(pid).unwrap();
+        let tid2 = manager.create_thread(pid).unwrap();
+
+        assert_ne!(tid1, tid2, "Thread IDs within a process should be unique");
+
+        assert_eq!(manager.get_thread_state(pid, tid1).unwrap(), ThreadState::Ready);
+        assert_eq!(manager.get_thread_state(pid, tid2).unwrap(), ThreadState::Ready);
+    }
+
+    #[test]
+    fn test_terminate_thread_in_process() {
+        let mut manager = SimpleProcessManager::new();
+        let pid = manager.create_process().unwrap();
+        let tid = manager.create_thread(pid).unwrap();
+
+        let terminate_result = manager.terminate_thread(pid, tid);
+        assert!(terminate_result.is_ok(), "Failed to terminate thread: {:?}", terminate_result.err());
+
+        // Verify thread is gone by trying to get its state
+        match manager.get_thread_state(pid, tid) {
+            Err(KernelError::NotFound) => { /* Expected: Thread not found within process */ },
+            Ok(_) => panic!("Thread state was found after termination"),
+            Err(e) => panic!("Unexpected error after terminating thread: {:?}", e),
+        }
+    }
+
+    #[test]
+    fn test_sleep_thread_in_process() {
+        let mut manager = SimpleProcessManager::new();
+        let pid = manager.create_process().unwrap();
+        let tid = manager.create_thread(pid).unwrap();
+
+        let sleep_result = manager.sleep_thread(pid, tid, 100); // Duration is conceptual
+        assert!(sleep_result.is_ok(), "Failed to sleep thread: {:?}", sleep_result.err());
+
+        assert_eq!(manager.get_thread_state(pid, tid).unwrap(), ThreadState::Blocked);
+    }
+
+    #[test]
+    fn test_thread_operations_on_non_existent_process() {
+        let mut manager = SimpleProcessManager::new();
+        let non_existent_pid: ProcessId = 999;
+        let dummy_tid: ThreadId = 1; // Dummy TID for calls
+
+        match manager.create_thread(non_existent_pid) {
+            Err(KernelError::NotFound) => { /* Expected */ },
+            res => panic!("Expected NotFound error for create_thread on non-existent process, got {:?}", res),
+        }
+
+        match manager.terminate_thread(non_existent_pid, dummy_tid) {
+            Err(KernelError::NotFound) => { /* Expected */ },
+            res => panic!("Expected NotFound error for terminate_thread on non-existent process, got {:?}", res),
+        }
+        
+        match manager.get_thread_state(non_existent_pid, dummy_tid) {
+            Err(KernelError::NotFound) => { /* Expected */ },
+            res => panic!("Expected NotFound error for get_thread_state on non-existent process, got {:?}", res),
+        }
+    }
+
+    #[test]
+    fn test_thread_operations_on_non_existent_thread() {
+        let mut manager = SimpleProcessManager::new();
+        let pid = manager.create_process().unwrap();
+        let non_existent_tid: ThreadId = 999;
+
+        // Terminate non-existent thread
+        match manager.terminate_thread(pid, non_existent_tid) {
+            Err(KernelError::NotFound) => { /* Expected: Thread not found within process */ },
+            res => panic!("Expected NotFound for terminate_thread on non-existent thread, got {:?}", res),
+        }
+
+        // Get state of non-existent thread
+        match manager.get_thread_state(pid, non_existent_tid) {
+            Err(KernelError::NotFound) => { /* Expected: Thread not found within process */ },
+            res => panic!("Expected NotFound for get_thread_state on non-existent thread, got {:?}", res),
+        }
+        
+        // Sleep non-existent thread
+        match manager.sleep_thread(pid, non_existent_tid, 100) {
+            Err(KernelError::NotFound) => { /* Expected: Thread not found within process */ },
+            res => panic!("Expected NotFound for sleep_thread on non-existent thread, got {:?}", res),
+        }
     }
 }
