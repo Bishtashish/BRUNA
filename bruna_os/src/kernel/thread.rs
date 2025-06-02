@@ -22,6 +22,7 @@ pub enum ThreadState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)] // Added PartialEq, Eq
+
 pub struct Thread {
     pub id: ThreadId,
     pub process_id: ProcessId,
