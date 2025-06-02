@@ -1,0 +1,18 @@
+[package]
+name = "bruna_os"
+version = "0.1.0"
+edition = "2021" # Or the latest stable edition
+authors = ["Bruna OS Developers <dev@bruna.os>"] # Placeholder
+description = "A modular Rust-based operating system for UAV swarms."
+license = "MIT OR Apache-2.0" # Example, choose appropriate license(s)
+repository = "https://github.com/your-username/bruna_os" # Placeholder
+
+[dependencies]
+# We don't have specific dependencies yet, but this section should exist.
+# Example:
+# log = "0.4"
+
+# Add a lib section if not already present from `cargo new --lib`
+[lib]
+name = "bruna_os"
+path = "src/lib.rs"
