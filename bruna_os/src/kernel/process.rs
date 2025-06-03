@@ -1,6 +1,6 @@
 // bruna_os/src/kernel/process.rs
 use super::KernelResult;
-use super::KernelError; 
+use super::KernelError;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::collections::HashMap;
 
@@ -196,7 +196,7 @@ mod tests {
         let mut manager = SimpleProcessManager::new();
         assert!(matches!(manager.terminate_process(999), Err(KernelError::NotFound)));
     }
-    
+
     // ThreadManagement tests from previous subtask
     #[test]
     fn test_create_thread_in_process() {
@@ -252,7 +252,7 @@ mod tests {
     fn test_integration_terminate_thread_removes_from_scheduler() {
         let mut manager = SimpleProcessManager::new();
         let pid = manager.create_process().unwrap();
-        let tid = manager.create_thread(pid).unwrap(); 
+        let tid = manager.create_thread(pid).unwrap();
 
         assert!(manager.scheduler.ready_queue.contains(&tid), "Thread should be in scheduler before termination");
         manager.terminate_thread(pid, tid).expect("Failed to terminate thread");
@@ -263,14 +263,14 @@ mod tests {
     fn test_integration_sleep_thread_removes_from_scheduler() {
         let mut manager = SimpleProcessManager::new();
         let pid = manager.create_process().unwrap();
-        let tid = manager.create_thread(pid).unwrap(); 
+        let tid = manager.create_thread(pid).unwrap();
 
         assert!(manager.scheduler.ready_queue.contains(&tid), "Thread should be in scheduler before sleep");
         manager.sleep_thread(pid, tid, 100).expect("Failed to sleep thread");
         assert!(!manager.scheduler.ready_queue.contains(&tid), "Sleeping thread should be removed from the scheduler's ready queue");
         assert_eq!(manager.get_thread_state(pid, tid).unwrap(), ThreadState::Blocked, "Thread should be in Blocked state");
     }
-    
+
     #[test]
     fn test_integration_scheduler_handles_multiple_threads() {
         let mut manager = SimpleProcessManager::new();
@@ -284,7 +284,7 @@ mod tests {
 
         let first_scheduled = manager.scheduler.schedule_next().unwrap();
         assert_eq!(manager.scheduler.ready_queue.len(), 2, "Scheduler should still have 2 threads after one schedule_next (round-robin re-adds)");
-        
+
         manager.terminate_thread(pid, first_scheduled).unwrap();
         assert_eq!(manager.scheduler.ready_queue.len(), 1, "Scheduler should have 1 thread after termination");
         assert!(!manager.scheduler.ready_queue.contains(&first_scheduled));

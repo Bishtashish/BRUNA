@@ -1,7 +1,6 @@
 // bruna_os/src/kernel/scheduler.rs
 use crate::kernel::thread::ThreadId;
 use crate::kernel::KernelResult;
-use crate::kernel::KernelError; // Explicitly import KernelError for custom errors if needed
 use std::collections::VecDeque; // For the ready queue
 
 // New/Refined Scheduler Trait Definition:
@@ -150,7 +149,7 @@ mod tests {
         assert_eq!(scheduler.schedule_next(), Some(tid1), "First schedule_next should return tid1");
         assert_eq!(scheduler.ready_queue.len(), 1, "Queue should still have 1 thread");
         assert_eq!(scheduler.ready_queue.front(), Some(&tid1), "tid1 should be back in queue (at front as it's the only one)");
-        
+
         assert_eq!(scheduler.schedule_next(), Some(tid1), "Second schedule_next should also return tid1");
     }
 
@@ -193,7 +192,7 @@ mod tests {
         let mut scheduler = RoundRobinScheduler::new();
         let tid1: ThreadId = 1;
         scheduler.add_thread(tid1).unwrap();
-        
+
         let non_existent_tid: ThreadId = 99;
         assert!(scheduler.remove_thread(non_existent_tid).is_ok(), "Removing non-existent thread should be Ok");
         assert_eq!(scheduler.ready_queue.len(), 1, "Queue should be unchanged");
@@ -211,7 +210,7 @@ mod tests {
     fn test_rr_mark_thread_ready_blocked_defaults() {
         let mut scheduler = RoundRobinScheduler::new();
         let tid1: ThreadId = 1;
-        
+
         // mark_thread_ready uses add_thread
         scheduler.mark_thread_ready(tid1).unwrap();
         assert_eq!(scheduler.ready_queue.len(), 1);
