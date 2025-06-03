@@ -1,6 +1,5 @@
 // bruna_os/src/kernel/scheduler.rs
 use super::thread::{ThreadId, Thread};
-use super::process::{ProcessId, Process};
 use super::KernelResult;
 
 pub trait Scheduler {

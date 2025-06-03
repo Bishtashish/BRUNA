@@ -1,5 +1,5 @@
 // bruna_os/src/hal/radio.rs
-use super::common::{HalResult, HalError};
+use super::common::HalResult;
 
 // Generic trait for radio transceivers like nRF24, LoRa, etc.
 pub trait RadioDevice {

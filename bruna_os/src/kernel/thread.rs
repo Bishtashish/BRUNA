@@ -52,10 +52,11 @@ impl Thread {
 // This will be implemented by SimpleProcessManager (or a dedicated ThreadManager).
 // Signatures will be reviewed and potentially updated in a later step.
 pub trait ThreadManagement {
-    fn create_thread(pid: ProcessId /*, start_routine, args */) -> KernelResult<ThreadId>;
-    fn terminate_thread(pid: ProcessId, tid: ThreadId) -> KernelResult<()>; // Tentatively adding pid
-    fn sleep_thread(pid: ProcessId, tid: ThreadId, duration_ms: u64) -> KernelResult<()>; // Tentatively adding pid
-    fn get_thread_state(pid: ProcessId, tid: ThreadId) -> KernelResult<ThreadState>; // Added
+    fn create_thread(&mut self, pid: ProcessId /*, start_routine, args */) -> KernelResult<ThreadId>;
+    fn terminate_thread(&mut self, pid: ProcessId, tid: ThreadId) -> KernelResult<()>;
+    fn sleep_thread(&mut self, pid: ProcessId, tid: ThreadId, duration_ms: u64) -> KernelResult<()>;
+    fn get_thread_state(&self, pid: ProcessId, tid: ThreadId) -> KernelResult<ThreadState>;
+
     // fn yield_thread(); // Might be handled by scheduler
     // fn join_thread(tid: ThreadId) -> KernelResult<()>; // For waiting for a thread to finish
 }
