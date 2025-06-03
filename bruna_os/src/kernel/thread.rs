@@ -22,6 +22,7 @@ pub enum ThreadState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)] // Added PartialEq, Eq
+
 pub struct Thread {
     pub id: ThreadId,
     pub process_id: ProcessId,
@@ -55,6 +56,7 @@ pub trait ThreadManagement {
     fn terminate_thread(&mut self, pid: ProcessId, tid: ThreadId) -> KernelResult<()>;
     fn sleep_thread(&mut self, pid: ProcessId, tid: ThreadId, duration_ms: u64) -> KernelResult<()>;
     fn get_thread_state(&self, pid: ProcessId, tid: ThreadId) -> KernelResult<ThreadState>;
+
     // fn yield_thread(); // Might be handled by scheduler
     // fn join_thread(tid: ThreadId) -> KernelResult<()>; // For waiting for a thread to finish
 }
