@@ -1,85 +1,60 @@
 // bruna_os/src/kernel/process.rs
 use super::KernelResult;
 use super::KernelError;
-// Ensure KernelError is explicitly in scope
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::collections::HashMap;
-use crate::kernel::scheduler::{RoundRobinScheduler, Scheduler}; // Moved HashMap import to the top
 
-// Import thread-related items
 use crate::kernel::thread::{Thread, ThreadId, ThreadState, generate_tid as generate_thread_id};
-use crate::kernel::thread::ThreadManagement; // Added import for the trait itself
+use crate::kernel::thread::ThreadManagement;
+use crate::kernel::scheduler::{RoundRobinScheduler, Scheduler};
+use crate::kernel::ipc::{SystemMessageBus, Message, MessagePassing, MessageId};
 
-// Static counter for generating unique ProcessIds
-static NEXT_PROCESS_ID: AtomicU64 = AtomicU64::new(1); // Start from 1, 0 could be special
-
+static NEXT_PROCESS_ID: AtomicU64 = AtomicU64::new(1);
 pub type ProcessId = u64;
 
-// Function to generate a new unique ProcessId
 pub fn generate_pid() -> ProcessId {
     NEXT_PROCESS_ID.fetch_add(1, Ordering::Relaxed)
 }
 
-// Basic Process State
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProcessState {
-    New,
-    Ready,
-    Running,
-    Waiting,
-    Terminated,
+    New, Ready, Running, Waiting, Terminated,
 }
 
-// Basic Process Control Block (PCB) structure
-#[derive(Debug, Clone)] // Added Clone for easier management in SimpleProcessManager
+#[derive(Debug, Clone)]
 pub struct Process {
     pub id: ProcessId,
     pub state: ProcessState,
-    pub threads: HashMap<ThreadId, Thread>, // Added field for threads
-    // pub parent_id: Option<ProcessId>,
-    // pub priority: u8,
-    // pub memory_space: (), // Placeholder for MemorySpace from memory.rs
+    pub threads: HashMap<ThreadId, Thread>,
 }
 
 impl Process {
-    // Constructor for a new Process
     pub fn new(id: ProcessId) -> Self {
         Process {
             id,
-            state: ProcessState::New, // Default state for a new process
-            threads: HashMap::new(), // Initialize the new threads map
-            // parent_id: None,
-            // priority: 0,
-            // memory_space: (),
+            state: ProcessState::New,
+            threads: HashMap::new(),
         }
     }
 
-    // New methods to be added:
-
     pub fn create_new_thread(&mut self) -> KernelResult<ThreadId> {
-        let new_tid = generate_thread_id(); // Uses the imported aliased function
-        // In a real scenario, one might check if new_tid somehow already exists in self.threads,
-        // though a global atomic counter makes this extremely unlikely.
+        let new_tid = generate_thread_id();
         if self.threads.contains_key(&new_tid) {
-            return Err(KernelError::IPCError("Thread ID collision within process".to_string()));
+            return Err(KernelError::Other("Thread ID collision within process".to_string()));
         }
-        let new_thread = Thread::new(new_tid, self.id.clone()); // self.id is the ProcessId
+        let new_thread = Thread::new(new_tid, self.id);
         self.threads.insert(new_tid, new_thread);
         Ok(new_tid)
     }
 
     pub fn terminate_existing_thread(&mut self, tid: ThreadId) -> KernelResult<()> {
-        if self.threads.remove(&tid).is_some() {
-            Ok(())
-        } else {
-            Err(KernelError::NotFound) // Thread not found in this process
-        }
+        if self.threads.remove(&tid).is_some() { Ok(()) } else { Err(KernelError::NotFound) }
     }
 
     pub fn get_thread_state(&self, tid: ThreadId) -> KernelResult<ThreadState> {
         match self.threads.get(&tid) {
             Some(thread) => Ok(thread.state),
-            None => Err(KernelError::NotFound), // Thread not found in this process
+            None => Err(KernelError::NotFound),
         }
     }
 
@@ -89,82 +64,61 @@ impl Process {
                 thread.state = new_state;
                 Ok(())
             }
-            None => Err(KernelError::NotFound), // Thread not found in this process
+            None => Err(KernelError::NotFound),
         }
     }
 }
 
 pub trait ProcessManagement {
-    // Updated to reflect that ProcessId is generated internally now
-    fn create_process(&mut self /* args for the process, like a path to an executable or a function pointer */) -> KernelResult<ProcessId>;
+    fn create_process(&mut self) -> KernelResult<ProcessId>;
     fn terminate_process(&mut self, pid: ProcessId) -> KernelResult<()>;
     fn get_process_state(&self, pid: ProcessId) -> KernelResult<ProcessState>;
-    // fn list_processes() -> Vec<ProcessInfo>; // Could be Process struct itself or a summary
 }
 
-// Manages all active processes in the system
-#[derive(Debug, Default)] // Default can be used for a simple new()
+#[derive(Debug)]
 pub struct SimpleProcessManager {
     processes: HashMap<ProcessId, Process>,
-    pub scheduler: RoundRobinScheduler, // Made scheduler field public for testing
-
-    // We don't need to store next_pid here if we use the global static atomic NEXT_PROCESS_ID
-    // and call generate_pid() when a process is created.
+    pub scheduler: RoundRobinScheduler, // Existing field
+    ipc_bus: SystemMessageBus,          // Added IPC bus field
 }
 
 impl SimpleProcessManager {
-    // Creates a new, empty SimpleProcessManager
     pub fn new() -> Self {
         SimpleProcessManager {
             processes: HashMap::new(),
             scheduler: RoundRobinScheduler::new(),
+            ipc_bus: SystemMessageBus::new(), // Initialize ipc_bus
         }
     }
 }
 
-// Implementation of the ProcessManagement trait for SimpleProcessManager
 impl ProcessManagement for SimpleProcessManager {
     fn create_process(&mut self) -> KernelResult<ProcessId> {
         let new_pid = generate_pid();
         let new_process = Process::new(new_pid);
-
-        // It's good practice to ensure the PID isn't somehow already in use,
-        // though with an atomic counter, this is highly unlikely for new PIDs.
-        // For robustness, one might loop generate_pid until a truly unique one is found if the map already contained it,
-        // but for this basic implementation, we assume generate_pid() is sufficient.
         if self.processes.contains_key(&new_pid) {
-            // This case should ideally not happen with a monotonic global atomic counter
-            // unless PIDs can be reused after termination and the counter wraps or isn't global.
-            // For now, let's treat it as an unexpected error.
-            return Err(super::KernelError::IPCError("PID collision, this should not happen".to_string()));
+            return Err(KernelError::Other("PID collision".to_string()));
         }
-
         self.processes.insert(new_pid, new_process);
         Ok(new_pid)
     }
 
     fn terminate_process(&mut self, pid: ProcessId) -> KernelResult<()> {
-        if self.processes.remove(&pid).is_some() {
-            Ok(())
-        } else {
-            Err(super::KernelError::NotFound)
-        }
+        if self.processes.remove(&pid).is_some() { Ok(()) } else { Err(KernelError::NotFound) }
     }
 
     fn get_process_state(&self, pid: ProcessId) -> KernelResult<ProcessState> {
         match self.processes.get(&pid) {
             Some(process) => Ok(process.state),
-            None => Err(super::KernelError::NotFound),
+            None => Err(KernelError::NotFound),
         }
     }
 }
 
-// NEW IMPLEMENTATION BLOCK STARTS HERE
 impl ThreadManagement for SimpleProcessManager {
-    fn create_thread(&mut self, pid: ProcessId /*, _start_routine, _args */) -> KernelResult<ThreadId> {
+    fn create_thread(&mut self, pid: ProcessId) -> KernelResult<ThreadId> {
         match self.processes.get_mut(&pid) {
             Some(process) => {
-                // Now call the method on the Process struct
                 let thread_result = process.create_new_thread();
                 if let Ok(tid) = thread_result {
                     if process.get_thread_state(tid) == Ok(ThreadState::Ready) {
@@ -173,7 +127,7 @@ impl ThreadManagement for SimpleProcessManager {
                 }
                 thread_result
             }
-            None => Err(KernelError::NotFound), // Process not found
+            None => Err(KernelError::NotFound),
         }
     }
 
@@ -186,13 +140,11 @@ impl ThreadManagement for SimpleProcessManager {
                 }
                 terminate_result
             }
-            None => Err(KernelError::NotFound), // Process not found
+            None => Err(KernelError::NotFound),
         }
     }
 
     fn sleep_thread(&mut self, pid: ProcessId, tid: ThreadId, _duration_ms: u64) -> KernelResult<()> {
-        // _duration_ms is ignored for now as we don't have actual sleep timers/scheduler interaction.
-        // We just set the state to Blocked.
         match self.processes.get_mut(&pid) {
             Some(process) => {
                 let sleep_result = process.set_thread_state(tid, ThreadState::Blocked);
@@ -201,25 +153,36 @@ impl ThreadManagement for SimpleProcessManager {
                 }
                 sleep_result
             }
-            None => Err(KernelError::NotFound), // Process not found
+            None => Err(KernelError::NotFound),
         }
     }
 
     fn get_thread_state(&self, pid: ProcessId, tid: ThreadId) -> KernelResult<ThreadState> {
         match self.processes.get(&pid) {
-            Some(process) => {
-                process.get_thread_state(tid)
-            }
-            None => Err(KernelError::NotFound), // Process not found
+            Some(process) => process.get_thread_state(tid),
+            None => Err(KernelError::NotFound),
         }
     }
 }
-// NEW IMPLEMENTATION BLOCK ENDS HERE
+
+// New: Implement MessagePassing for SimpleProcessManager by delegating to ipc_bus
+impl MessagePassing for SimpleProcessManager {
+    fn send_message(&mut self, message: Message) -> KernelResult<()> {
+        self.ipc_bus.send_message(message)
+    }
+
+    fn receive_message(&mut self, receiver_pid: ProcessId) -> KernelResult<Message> {
+        self.ipc_bus.receive_message(receiver_pid)
+    }
+
+    fn try_receive_message(&mut self, receiver_pid: ProcessId) -> KernelResult<Option<Message>> {
+        self.ipc_bus.try_receive_message(receiver_pid)
+    }
+}
 
 #[cfg(test)]
 mod tests {
-    // use crate::kernel::scheduler::Scheduler;
-    use super::*; // Imports SimpleProcessManager, ProcessManagement trait, ProcessState, KernelError, etc.
+    use super::*;
 
     #[test]
     fn test_create_process() {
@@ -346,5 +309,77 @@ mod tests {
 
         let remaining_tid = if first_scheduled == tid1 { tid2 } else { tid1 };
         assert!(manager.scheduler.ready_queue.contains(&remaining_tid));
+    }
+
+    // New tests focusing on IPC integration via SimpleProcessManager:
+
+    #[test]
+    fn test_spm_ipc_send_receive_between_processes() {
+        let mut manager = SimpleProcessManager::new();
+        let pid1 = manager.create_process().expect("Failed to create process 1");
+        let pid2 = manager.create_process().expect("Failed to create process 2");
+
+        let payload_p1_to_p2 = vec![1, 2, 3, 4, 5];
+        let message_p1 = Message::new(pid1, pid2, payload_p1_to_p2.clone());
+        let msg1_id = message_p1.id;
+
+        // SPM now implements MessagePassing, so we call it directly on manager
+        assert!(manager.send_message(message_p1).is_ok(), "Process 1 failed to send message");
+
+        // Process 2 receives the message
+        let received_message_result = manager.receive_message(pid2);
+        assert!(received_message_result.is_ok(), "Process 2 failed to receive message: {:?}", received_message_result.err());
+        let received_message = received_message_result.unwrap();
+
+        assert_eq!(received_message.id, msg1_id);
+        assert_eq!(received_message.sender_pid, pid1);
+        assert_eq!(received_message.receiver_pid, pid2);
+        assert_eq!(received_message.payload, payload_p1_to_p2);
+    }
+
+    #[test]
+    fn test_spm_ipc_try_receive_no_message() {
+        let mut manager = SimpleProcessManager::new();
+        let pid1 = manager.create_process().unwrap(); // Process that will try to receive
+
+        let result = manager.try_receive_message(pid1);
+        assert!(result.is_ok(), "try_receive_message failed");
+        assert!(result.unwrap().is_none(), "Expected no message for pid1");
+    }
+
+    #[test]
+    fn test_spm_ipc_receive_no_message_error() {
+        let mut manager = SimpleProcessManager::new();
+        let pid1 = manager.create_process().unwrap();
+
+        let result = manager.receive_message(pid1);
+        assert!(result.is_err(), "receive_message should fail for empty queue");
+        assert_eq!(result.err().unwrap(), KernelError::NotFound); // Or specific NoMessage error
+    }
+
+    #[test]
+    fn test_spm_ipc_multiple_messages_fifo() {
+        let mut manager = SimpleProcessManager::new();
+        let p_sender = manager.create_process().unwrap();
+        let p_receiver = manager.create_process().unwrap();
+
+        let msg_payload1 = vec![10];
+        let msg_payload2 = vec![20];
+
+        let msg1 = Message::new(p_sender, p_receiver, msg_payload1.clone());
+        let msg2 = Message::new(p_sender, p_receiver, msg_payload2.clone());
+        let msg1_id = msg1.id;
+        let msg2_id = msg2.id;
+
+        manager.send_message(msg1).unwrap();
+        manager.send_message(msg2).unwrap();
+
+        let recv_msg1 = manager.receive_message(p_receiver).unwrap();
+        assert_eq!(recv_msg1.id, msg1_id);
+        assert_eq!(recv_msg1.payload, msg_payload1);
+
+        let recv_msg2 = manager.receive_message(p_receiver).unwrap();
+        assert_eq!(recv_msg2.id, msg2_id);
+        assert_eq!(recv_msg2.payload, msg_payload2);
     }
 }
