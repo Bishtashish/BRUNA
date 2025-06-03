@@ -59,7 +59,7 @@ impl Process {
         // In a real scenario, one might check if new_tid somehow already exists in self.threads,
         // though a global atomic counter makes this extremely unlikely.
         if self.threads.contains_key(&new_tid) {
-            return Err(KernelError::Other("Thread ID collision within process".to_string()));
+            return Err(KernelError::IPCError("Thread ID collision within process".to_string()));
         }
         let new_thread = Thread::new(new_tid, self.id); // self.id is the ProcessId
         self.threads.insert(new_tid, new_thread);
@@ -131,7 +131,7 @@ impl ProcessManagement for SimpleProcessManager {
             // This case should ideally not happen with a monotonic global atomic counter
             // unless PIDs can be reused after termination and the counter wraps or isn't global.
             // For now, let's treat it as an unexpected error.
-            return Err(super::KernelError::Other("PID collision, this should not happen".to_string()));
+            return Err(super::KernelError::IPCError("PID collision, this should not happen".to_string()));
         }
 
         self.processes.insert(new_pid, new_process);
