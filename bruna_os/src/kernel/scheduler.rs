@@ -1,7 +1,7 @@
 // bruna_os/src/kernel/scheduler.rs
 use crate::kernel::thread::ThreadId;
 use crate::kernel::KernelResult;
-use crate::kernel::KernelError; // Explicitly import KernelError for custom errors if needed
+ // Explicitly import KernelError for custom errors if needed
 use std::collections::VecDeque; // For the ready queue
 
 // New/Refined Scheduler Trait Definition:
