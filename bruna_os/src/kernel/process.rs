@@ -94,9 +94,9 @@ impl Process {
 
 pub trait ProcessManagement {
     // Updated to reflect that ProcessId is generated internally now
-    fn create_process(/* args for the process, like a path to an executable or a function pointer */) -> KernelResult<ProcessId>;
-    fn terminate_process(pid: ProcessId) -> KernelResult<()>;
-    fn get_process_state(pid: ProcessId) -> KernelResult<ProcessState>;
+    fn create_process(&mut self /* args for the process, like a path to an executable or a function pointer */) -> KernelResult<ProcessId>;
+    fn terminate_process(&mut self, pid: ProcessId) -> KernelResult<()>;
+    fn get_process_state(&self, pid: ProcessId) -> KernelResult<ProcessState>;
     // fn list_processes() -> Vec<ProcessInfo>; // Could be Process struct itself or a summary
 }
 
