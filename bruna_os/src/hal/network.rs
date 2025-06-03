@@ -1,5 +1,5 @@
 // bruna_os/src/hal/network.rs
-use super::common::{HalResult, HalError, HardwareId};
+use super::common::{HalResult, HardwareId};
 
 #[derive(Debug, Clone)]
 pub enum IpAddress {

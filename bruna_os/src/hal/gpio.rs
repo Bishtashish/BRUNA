@@ -1,5 +1,5 @@
 // bruna_os/src/hal/gpio.rs
-use super::common::{HalResult, HalError};
+use super::common::HalResult;
 
 #[derive(Debug, Clone, Copy)]
 pub enum PinMode {
