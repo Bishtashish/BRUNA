@@ -14,14 +14,16 @@ pub use timers::Timer;
 pub use network::NetworkInterface;
 pub use radio::RadioDevice;
 
+pub mod platforms;
+
 // A generic trait that all platform-specific HALs might implement
-// pub trait PlatformHal {
-//     type Serial: SerialDevice;
-//     type Gpio: GpioPin; // This might be a collection of pins
-//     type Timer: Timer;
-//     type Network: NetworkInterface;
-//     type Radio: RadioDevice;
-//
-//     fn new() -> Self; // Or some platform specific init
-//     fn platform_name(&self) -> &'static str;
-// }
+pub trait PlatformHal {
+    type Serial: SerialDevice;
+    type Gpio: GpioPin; // This might be a collection of pins
+    type Timer: Timer;
+    type Network: NetworkInterface;
+    type Radio: RadioDevice;
+
+    fn new() -> Self; // Or some platform specific init
+    fn platform_name(&self) -> &'static str;
+}
