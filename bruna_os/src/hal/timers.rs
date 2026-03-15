@@ -1,5 +1,5 @@
 // bruna_os/src/hal/timers.rs
-use super::common::{HalResult, HalError};
+use super::common::HalResult;
 use std::time::Duration;
 
 pub trait Timer {
