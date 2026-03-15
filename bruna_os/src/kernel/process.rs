@@ -1,6 +1,5 @@
 // bruna_os/src/kernel/process.rs
-use super::KernelResult;
-use super::KernelError; // Ensure KernelError is explicitly in scope
+use super::{KernelResult, KernelError};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::collections::HashMap; // Moved HashMap import to the top
 
@@ -51,10 +50,10 @@ impl Process {
 
 pub trait ProcessManagement {
     // Updated to reflect that ProcessId is generated internally now
-    fn create_process(/* args for the process, like a path to an executable or a function pointer */) -> KernelResult<ProcessId>;
-    fn terminate_process(pid: ProcessId) -> KernelResult<()>;
-    fn get_process_state(pid: ProcessId) -> KernelResult<ProcessState>;
-    // fn list_processes() -> Vec<ProcessInfo>; // Could be Process struct itself or a summary
+    fn create_process(&mut self /* args for the process, like a path to an executable or a function pointer */) -> KernelResult<ProcessId>;
+    fn terminate_process(&mut self, pid: ProcessId) -> KernelResult<()>;
+    fn get_process_state(&self, pid: ProcessId) -> KernelResult<ProcessState>;
+    // fn list_processes(&self) -> Vec<ProcessInfo>; // Could be Process struct itself or a summary
 }
 
 // Manages all active processes in the system
@@ -88,7 +87,7 @@ impl ProcessManagement for SimpleProcessManager {
             // This case should ideally not happen with a monotonic global atomic counter
             // unless PIDs can be reused after termination and the counter wraps or isn't global.
             // For now, let's treat it as an unexpected error.
-            return Err(super::KernelError::Other("PID collision, this should not happen".to_string()));
+            return Err(KernelError::Other("PID collision, this should not happen".to_string()));
         }
 
         self.processes.insert(new_pid, new_process);
@@ -99,7 +98,7 @@ impl ProcessManagement for SimpleProcessManager {
         if self.processes.remove(&pid).is_some() {
             Ok(())
         } else {
-            Err(super::KernelError::NotFound)
+            Err(KernelError::NotFound)
         }
     }
 
@@ -189,7 +188,7 @@ mod tests {
 
     #[test]
     fn test_get_process_state_non_existent() {
-        let mut manager = SimpleProcessManager::new();
+        let manager = SimpleProcessManager::new();
         let non_existent_pid: ProcessId = 999;
         
         let state_result = manager.get_process_state(non_existent_pid);

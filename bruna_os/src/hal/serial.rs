@@ -1,5 +1,5 @@
 // bruna_os/src/hal/serial.rs
-use super::common::{HalResult, HalError};
+use super::common::HalResult;
 
 pub trait SerialDevice {
     fn open(port: &str, baud_rate: u32) -> HalResult<Self> where Self: Sized;

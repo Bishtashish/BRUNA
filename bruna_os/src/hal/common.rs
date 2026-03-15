@@ -1,7 +1,7 @@
 // bruna_os/src/hal/common.rs
 
 // Unique identifier for a piece of hardware
-pub struct HardwareId(String); // Could be MAC address, serial number, etc.
+pub struct HardwareId(pub String); // Could be MAC address, serial number, etc.
 
 #[derive(Debug)]
 pub enum HalError {

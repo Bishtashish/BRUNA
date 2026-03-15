@@ -13,6 +13,7 @@ pub enum KernelError {
     MemoryNotAvailable,
     IPCError(String),
     FeatureNotImplemented,
+    Other(String),
 }
 
 pub type KernelResult<T> = Result<T, KernelError>;
