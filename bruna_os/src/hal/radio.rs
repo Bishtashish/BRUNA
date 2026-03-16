@@ -1,9 +1,12 @@
 // bruna_os/src/hal/radio.rs
 use super::common::HalResult;
 
+use super::common::HardwareId;
+
 // Generic trait for radio transceivers like nRF24, LoRa, etc.
 pub trait RadioDevice {
     fn new(/* config parameters */) -> HalResult<Self> where Self: Sized;
+    fn list_visible_devices(&self) -> HalResult<Vec<HardwareId>>;
     fn set_channel(&mut self, channel: u8) -> HalResult<()>;
     fn set_datarate(&mut self, datarate: &str) -> HalResult<()>; // e.g., "250kbps", "1Mbps"
     fn set_tx_power(&mut self, power_level: i8) -> HalResult<()>;
