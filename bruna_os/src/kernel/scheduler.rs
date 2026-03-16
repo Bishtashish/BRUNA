@@ -1,6 +1,7 @@
 // bruna_os/src/kernel/scheduler.rs
 use crate::kernel::thread::ThreadId;
 use crate::kernel::KernelResult;
+ // Explicitly import KernelError for custom errors if needed
 use std::collections::VecDeque; // For the ready queue
 
 // New/Refined Scheduler Trait Definition:
@@ -42,7 +43,7 @@ pub trait Scheduler {
 // Definition of the RoundRobinScheduler
 #[derive(Debug, Default)] // Default will create an empty queue
 pub struct RoundRobinScheduler {
-    ready_queue: VecDeque<ThreadId>,
+    pub(crate) ready_queue: VecDeque<ThreadId>,
 }
 
 impl RoundRobinScheduler {
