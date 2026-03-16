@@ -1,4 +1,4 @@
-use crate::hal::common::{HardwareId, HalError, HalResult};
+use crate::hal::common::{HardwareId, HalError, HalResult, Storage};
 use crate::hal::gpio::{GpioPin, PinMode, PinState};
 use crate::hal::serial::SerialDevice;
 use crate::hal::timers::Timer;
@@ -17,6 +17,7 @@ pub struct TelloHal;
 // Dummy types for associated types (replace with actual types later)
 pub struct DummySerial;
 impl SerialDevice for DummySerial {
+    fn hardware_id(&self) -> HardwareId { HardwareId("tello_serial".to_string()) }
     fn open(_port: &str, _baud_rate: u32) -> HalResult<Self> { Err(HalError::UnsupportedOperation) }
     fn read(&mut self, _buffer: &mut [u8]) -> HalResult<usize> { Err(HalError::UnsupportedOperation) }
     fn write(&mut self, _data: &[u8]) -> HalResult<usize> { Err(HalError::UnsupportedOperation) }
@@ -53,12 +54,22 @@ impl NetworkInterface for DummyNetwork {
 
 pub struct DummyRadio;
 impl RadioDevice for DummyRadio {
-    fn new() -> HalResult<Self> { Err(HalError::UnsupportedOperation) }
+    fn new() -> HalResult<Self> { Ok(DummyRadio) }
+    fn list_visible_devices(&self) -> HalResult<Vec<HardwareId>> {
+        Ok(vec![HardwareId("paired_sensor_1".to_string())])
+    }
     fn set_channel(&mut self, _channel: u8) -> HalResult<()> { Err(HalError::UnsupportedOperation) }
     fn set_datarate(&mut self, _datarate: &str) -> HalResult<()> { Err(HalError::UnsupportedOperation) }
     fn set_tx_power(&mut self, _power_level: i8) -> HalResult<()> { Err(HalError::UnsupportedOperation) }
     fn transmit(&mut self, _payload: &[u8]) -> HalResult<()> { Err(HalError::UnsupportedOperation) }
     fn receive(&mut self, _buffer: &mut [u8]) -> HalResult<usize> { Err(HalError::UnsupportedOperation) }
+}
+
+pub struct DummyStorage;
+impl Storage for DummyStorage {
+    fn read(&self, _offset: usize, _buf: &mut [u8]) -> HalResult<usize> { Err(HalError::UnsupportedOperation) }
+    fn write(&mut self, _offset: usize, _buf: &[u8]) -> HalResult<usize> { Err(HalError::UnsupportedOperation) }
+    fn size(&self) -> usize { 0 }
 }
 
 
@@ -68,6 +79,7 @@ impl PlatformHal for TelloHal {
     type Timer = DummyTimer;   // Placeholder
     type Network = DummyNetwork; // Placeholder
     type Radio = DummyRadio;   // Placeholder
+    type Storage = DummyStorage;
 
     fn new() -> Self {
         TelloHal // Or some platform specific init
@@ -138,9 +150,6 @@ mod tests {
     #[test]
     fn test_tello_hal_dummy_radio() {
         let radio_result = <TelloHal as PlatformHal>::Radio::new();
-        match radio_result {
-            Err(HalError::UnsupportedOperation) => assert!(true), // Expected
-            _ => assert!(false, "Expected UnsupportedOperation error for radio new"),
-        }
+        assert!(radio_result.is_ok());
     }
 }

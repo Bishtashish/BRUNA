@@ -7,7 +7,7 @@ pub mod network;
 pub mod radio; // For generic radio communication like nRF24
 
 // Re-export common types or traits if desired
-pub use common::{HardwareId, HalError, HalResult};
+pub use common::{HardwareId, HalError, HalResult, Storage};
 pub use serial::SerialDevice;
 pub use gpio::{GpioPin, PinMode, PinState};
 pub use timers::Timer;
@@ -23,6 +23,7 @@ pub trait PlatformHal {
     type Timer: Timer;
     type Network: NetworkInterface;
     type Radio: RadioDevice;
+    type Storage: Storage;
 
     fn new() -> Self; // Or some platform specific init
     fn platform_name(&self) -> &'static str;
