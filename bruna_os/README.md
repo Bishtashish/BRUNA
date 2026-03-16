@@ -13,8 +13,8 @@ Our goal is to create a **Hive Mind** architecture that:
 ## 🏗️ Current State
 This branch represents the **Foundational Architecture** phase. We have established the core traits and modular structure that will support the OS's evolution.
 
-- **Microkernel Foundation:** Initial traits for Process Management, Threading, and Scheduling are defined.
-- **Modular HAL:** A robust Hardware Abstraction Layer (HAL) framework is in place, with initial support for platforms like the Ryze Tello.
+- **Microkernel Foundation:** Initial traits for Process Management, Threading, Scheduling, and **Component Registry** are defined.
+- **Modular HAL:** A robust Hardware Abstraction Layer (HAL) framework is in place, with initial support for platforms like the Ryze Tello and support for non-volatile **Storage**.
 - **Trait-Based Design:** High modularity ensures that any component (scheduler, memory manager, or driver) can be swapped without affecting the rest of the system.
 
 ## ✨ Features & Roadmap
@@ -27,6 +27,7 @@ Features are listed in increasing order of complexity, representing our journey 
 - [x] **Hardware Abstraction Layer (HAL):** Unified interfaces for Serial, GPIO, Timers, Network, and Radio.
 
 ### Phase 2: Integration (In Progress / Planned)
+- [/] **Trusted Component Identification:** Kernel-level discovery of paired sensors and hardware using a secure registry.
 - [ ] **Advanced IPC:** Robust message-passing between processes and eventually between devices.
 - [ ] **Dynamic Memory Management:** Efficient allocation and deallocation for resource-constrained devices.
 - [ ] **Physical Driver Implementations:** Moving beyond dummy HALs to support real-world hardware (sensors, motors).
@@ -43,7 +44,7 @@ Features are listed in increasing order of complexity, representing our journey 
 - [ ] **User-Centric Interface:** A high-level abstraction for humans to interact with the entire hive as a single entity.
 
 ## 📦 Modules
-- `kernel`: Core microkernel components (Scheduling, Processes, Threads, IPC).
+- `kernel`: Core microkernel components (Scheduling, Processes, Threads, IPC, Registry, Discovery).
 - `hal`: Hardware Abstraction Layer for cross-platform compatibility.
 - `drivers`: Device-specific implementations.
 - `services`: High-level OS services (Onboarding, Navigation, Swarm Management).
